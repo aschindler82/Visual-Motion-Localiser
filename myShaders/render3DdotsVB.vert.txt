@@ -1,0 +1,48 @@
+/* 
+ * Vertex shader to render 2D dots on screen. It is used in the optic flow condition.
+ * Almost identical to 'render2DplanarDotsVB.frag' but without option to
+ * move dots in xy plane after projection. Also applies clipping according to specified zNear.
+ * 
+ * Vertex and Colour are submitted via vertex attributes.
+ *
+ * Submitted vertices are expected to be already in xy viewport coordinates but have z coords of
+ * corresponding theoretic flow dots (see projectDots.frag.txt).
+ *
+ * (c) by as, August 2014
+ */
+
+attribute vec4 vertex2D;
+attribute vec4 dotColour;
+ 
+uniform float maxDotSize;
+uniform float zNear;
+ 
+vec4 vertex2draw;
+
+void main(void)
+{
+   /* store vertex attribute in vertex2draw variable to prevent silly compiler */
+   /* warning that we are not allowed to write to vertex attributes  */
+   vertex2draw = vertex2D;
+
+   gl_FrontColor = dotColour;
+
+   /* calc point size based on z coord of 3D vertex */
+   gl_PointSize = -zNear/vertex2D.z * maxDotSize;
+    
+   /* do zNear clipping */
+   if (vertex2D.z < -zNear)
+   {
+    /* draw vertex */
+    vertex2draw.z = 1.0;
+    vertex2draw.w = 1.0;
+    gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * vertex2draw;
+   }
+   else
+   {
+    /* clip vertex */
+    gl_PointSize = 0.0;
+    gl_Position = vec4(0.0, 0.0, 20.0, 1.0);
+   }
+   
+}

@@ -1,0 +1,76 @@
+/*
+ * Fragment shader that does some checks on our current set of 3D flow dots
+ * to find out which of our corresponding 2D scrambled dots are visible and
+ * thus should be rendered this frame.
+ *
+ * The results are stored in a texture.
+ *
+ * (c) by as, August 2014
+ */
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect xyDotCoords; /* 2D pos of flow dots in this frame */
+uniform sampler2DRect randSeeds;    /* random numbers texture */
+uniform sampler2DRect checkTex;     /* dot parameters of last frame */
+
+uniform vec4 viewPortVec;
+
+/* z pos of clipping planes */
+uniform float zNear;
+uniform float zFar;
+
+void main(void)
+{
+
+    /* get dot params of last frame: */
+    /* vec4(xDir, yDir, visible flag, 1.0) */
+    vec4 dotParams = texture2DRect(checkTex, gl_TexCoord[0].st).rgba;
+
+    /* get current 2D flow dot */
+    vec3 vertex2D = texture2DRect(xyDotCoords, gl_TexCoord[0].st).rgb;   
+    float dotZ 	  = vertex2D.z;
+	vertex2D.z 	  = 1.0;
+	
+    /* pre-set this vertex to visible */
+    float vertexIsVisible = 1.0;
+            
+    
+    /* does the vertex get clipped in z-direction? */
+    /* check xy clipping */    
+    if ( vertex2D.x > 0.0 && vertex2D.x < viewPortVec[2] && vertex2D.y > 0.0 && vertex2D.y < viewPortVec[3] && dotZ < -zNear && dotZ > -zFar)
+    {
+        /* this dot is within our boundaries */
+        vertexIsVisible = 1.0;
+		 
+    }   
+    else
+    {
+        /* this dot flew out  */
+         vertexIsVisible = 0.0;
+    }
+        
+    /* if vertex is not visible assign new xy directions to it */    
+    if ( vertexIsVisible == 0.0 )
+    {
+        /* xy directions */
+        vec2 dirTmp = vec2(-1.0, 1.0);
+    
+        /* get random numbers */
+        vec4 randNrs  = texture2DRect(randSeeds, gl_TexCoord[0].st).rgba;
+    
+        /* assign rand xy directions */
+        dotParams.x =  dirTmp[ int(ceil(randNrs.z*2.0)) ];
+        dotParams.y =  dirTmp[ int(ceil(randNrs.w*2.0)) ];
+    }
+
+    /* assign visibility */
+    dotParams.z = vertexIsVisible;
+
+    /* w component is currently not used */
+    dotParams.w = 1.0;
+
+    /* save params for this dot */
+    gl_FragColor = dotParams;
+    
+}

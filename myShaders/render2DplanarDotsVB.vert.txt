@@ -1,0 +1,76 @@
+/*
+ * Vertex shader to project vertices to 2D screen space.
+ *
+ * Submitted vertices are expected to be already in xy viewport coordinates but have z coords of
+ * corresponding theoretic flow dots (see projectDots.frag.txt).
+ *
+ * This shader is used in the planar motion condition to render
+ * the content of 'projectedDotsBuffer'
+ *
+ * Applies clipping according to specified zNear.
+ * Subsequently, it will move each vertex in xy plane according
+ * specified xy Offset.
+ * 
+ * Vertex and Colour are submitted via vertex attributes.
+ * 
+ *
+ * (c) by as, August 2014
+ */
+
+attribute vec4 vertex2D;
+attribute vec4 dotColour;
+ 
+uniform float maxDotSize;
+uniform float zNear;
+
+uniform vec2 xyOff;
+
+vec4 vertex2draw;
+
+mat4 rotationMatrix(vec3 myAxis, float angle)
+{ 
+ vec3 axis = normalize(myAxis);
+ float s   = sin(angle);
+ float c   = cos(angle);
+ float oc  = 1.0 - c;
+ 
+ return mat4(oc * axis.x * axis.x + c,          oc * axis.x * axis.y - axis.z * s, oc * axis.z * axis.x + axis.y * s, 0.0,
+             oc * axis.x * axis.y + axis.z * s, oc * axis.y * axis.y + c,          oc * axis.y * axis.z - axis.x * s, 0.0,
+             oc * axis.z * axis.x - axis.y * s, oc * axis.y * axis.z + axis.x * s, oc * axis.z * axis.z + c,          0.0,
+             0.0,                               0.0,                               0.0,                               1.0);
+}
+
+void main(void)
+{           
+   /* store vertex attribute in tmp variable to prevent silly shader */
+   /* warning that we are not allowed to write to vertex attributes  */
+   vertex2draw = vertex2D;
+
+   /* assign dot colour from vertex attribute */
+   gl_FrontColor = dotColour;
+   
+   /* calc dot size */
+   gl_PointSize = -zNear/vertex2D.z * maxDotSize;
+   
+   /* do zNear clipping */
+   if (vertex2D.z < -zNear)
+   {
+    /* assign z and w components */
+    vertex2draw.z = 1.0;
+    vertex2draw.w = 1.0;
+
+    /* move dots in xy plane */
+    vertex2draw.x = vertex2D.x + xyOff[0];
+    vertex2draw.y = vertex2D.y + xyOff[1];
+    
+    /* project vertex */
+    gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * vertex2draw;   
+    
+   }
+   else
+   {
+    /* clip vertex */
+    gl_PointSize = 0.0;
+    gl_Position = vec4(0.0, 0.0, 20.0, 1.0);
+   }
+}

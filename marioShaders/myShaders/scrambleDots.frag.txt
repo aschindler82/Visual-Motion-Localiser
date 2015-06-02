@@ -1,0 +1,95 @@
+/* FDF shader for sampling of rendered silhouette at provided random
+ * sampling positions in order to update background dot distribution.
+ *
+ * (c) 2008 by Mario Kleiner, licensed under MIT license.
+ */
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect xyzDotCoords;
+uniform sampler2DRect xyzDotCoordsLast;
+uniform sampler2DRect checkTex;
+uniform sampler2DRect myRandSeeds;
+uniform sampler2DRect xyDotsLast;
+
+uniform mat4 modelViewMat;
+uniform mat4 modelMat;
+uniform mat4 projMat;
+
+uniform vec4 viewPortVec;
+
+
+vec4 projectVertex(vec4 vertex3D, mat4 modelMat, mat4 projMat, vec4 viewPortVec)
+{
+    vec4 vertex2D;
+    
+    /* calculate perspective projection based on submitted matrices */
+    vertex2D = modelMat * vertex3D;
+    vertex2D = projMat  * vertex2D;
+
+    /* divide by w */
+    vertex2D.x = vertex2D.x / vertex2D.w;
+    vertex2D.y = vertex2D.y / vertex2D.w;
+    vertex2D.z = vertex2D.z / vertex2D.w;
+
+    /* range 0-1 */
+    vertex2D.x = vertex2D.x * 0.5 + 0.5;
+    vertex2D.y = vertex2D.y * 0.5 + 0.5;
+    vertex2D.z = vertex2D.z * 0.5 + 0.5;
+    
+    
+    /* map to viewport */
+    vertex2D.x = vertex2D.x * viewPortVec[2] + viewPortVec[0];
+    vertex2D.y = vertex2D.y * viewPortVec[3] + viewPortVec[1];
+    vertex2D.w = 1.0;
+    
+    return vertex2D;
+}
+
+
+void main(void)
+{
+    /* vertex of this frame */
+    vec4 vertex3D = texture2DRect(xyzDotCoords, gl_TexCoord[0].st).rgba;    
+    vec4 vertex2D = projectVertex(vertex3D, modelMat, projMat, viewPortVec);
+    
+    /* same vertex in last frame */
+    vec4 vertex3Dlast = texture2DRect(xyzDotCoordsLast, gl_TexCoord[0].st).rgba;    
+    vec4 vertex2Dlast = projectVertex(vertex3Dlast, modelMat, projMat, viewPortVec);
+    
+    /* get random seed */
+    vec4 randXY = texture2DRect(myRandSeeds, gl_TexCoord[0].st).rgba;
+    
+    /* get current scramble 2D dot */
+    vec4 vertex2Dscramble = texture2DRect(xyDotsLast, gl_TexCoord[0].st).rgba;    
+    
+    /* get dot params, i.e. visibility and xy directions */
+    vec4 dotParams = texture2DRect(checkTex,  gl_TexCoord[0].st).rgba;   
+    
+    /* did any dot leave the screen -> yes then put it back */
+    if (vertex2Dscramble.x > viewPortVec[2] || vertex2Dscramble.x < 0.0 || vertex2Dscramble.y > viewPortVec[3] || vertex2Dscramble.y < 0.0 || vertex3Dlast.z > vertex3D.z)
+    {
+        /* yes: reassign theoretical dot */
+        vertex2Dscramble.x = randXY.x * viewPortVec[2];
+        vertex2Dscramble.y = randXY.y * viewPortVec[3];
+        
+    }
+    
+    /* just business as usual: calc x/y distances that this */
+    /* theoretical flow dot has been travelled since last frame */
+    vec4 diffDist  = vec4( vertex2Dlast.x - vertex2D.x, vertex2Dlast.y - vertex2D.y, 1.0, 1.0 );
+    
+    /* add this distance to the current scrambled 2D dot */
+    vertex2Dscramble.x = vertex2Dscramble.x + diffDist.x * dotParams.x;
+    vertex2Dscramble.y = vertex2Dscramble.y + diffDist.y * dotParams.y;
+    
+    /* save visibility flag in w to be processed by the rendering vertex shader */
+    vertex2Dscramble.w = dotParams.z;
+    
+    /* save current z-position of theoretical flow dot in z coord of scramble dot */
+    /* we will need it during rendering to calculate this 2D's dot size */
+    vertex2Dscramble.z = vertex3D.z;
+    
+    /* assign this scrambled dot to our frame buffer */
+    gl_FragColor = vertex2Dscramble;
+}

@@ -1,0 +1,56 @@
+/* 
+ * Vertex shader to project scrambled vertices to 2D screen space.
+ *
+ * Submitted vertices are expected to be already in xy viewport coordinates but have z coords of
+ * corresponding theoretic flow dots (see projectDots.frag.txt).
+ *
+ * This shader is used in the scramble dots condition
+ * to render the content of 'bufferScrambledDots'
+ * 
+ * z is the depth position of the corresponding flow dot of this scrambled dot and is used
+ * for point size calculation.
+ *
+ * w binarily codes for vertex visibility.
+ * We do not have to clip against zNear as this is included in the visibility feature already.
+ *
+ * (c) by as, August 2014
+ */
+
+attribute vec4 vertex2D;
+attribute vec4 dotColour;
+ 
+uniform float maxDotSize;
+uniform float zNear;
+ 
+vec4 vertex2draw;
+
+void main(void)
+{
+    /* store vertex attribute in tmp variable to prevent silly shader */
+    /* warning that we are not allowed to write to vertex attributes  */
+    vertex2draw = vertex2D;
+
+    /* get visibility parameter */
+    /* and set w component to 1 */
+    float isVisible = vertex2D.w;        
+    vertex2draw.w = 1.0;
+    
+    /* get dot colour from vertex buffer */
+    gl_FrontColor = dotColour;
+        
+    /* check for visibility */
+    if (isVisible == 0.0)    
+    {    
+        /* clip vertex */
+        vertex2draw = vec4(-1.0, 0.0, 0.0, 0.0);
+    }   
+    
+    /* calc point size based on z coord of corresponding flow dot */
+    /* and set z coord to 1.0 afterwards for projection */
+    gl_PointSize = -zNear/vertex2draw.z * maxDotSize;           
+    vertex2draw.z = 1.0;
+    
+    /* do 2D projection */
+    gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * vertex2draw;
+    
+}

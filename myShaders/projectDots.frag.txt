@@ -1,0 +1,60 @@
+/*
+ * Fragment shader that actually operates like a vertex shader.
+ * Using the user specified openGL matrices this shader projects
+ * submitted 3D vertices into 2D viewport space and stores them in
+ * a 2D texture coding rgba (r = x, g = y, b = z(of 3D vertex), a = 1).
+ *
+ * (c) by as, August 2014
+ */
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform mat4 modelViewMat;
+uniform mat4 modelMat;
+uniform mat4 projMat;
+
+uniform vec2 xySpeed;
+
+uniform vec4 viewPortVec;
+
+uniform sampler2DRect xyzDotCoords;
+
+void main(void)
+{
+
+    /* get 3D vertex from texture */
+    vec4 vertex3D = texture2DRect(xyzDotCoords, gl_TexCoord[0].st).rgba;
+    
+    /* backup vertex3D */
+    vec4 vertex = vertex3D;
+    
+    /* calculate perspective projection based on submitted matrices */
+    vertex = modelMat * vertex;
+    vertex = projMat  * vertex;
+
+    /* divide by w */
+    vertex.x = vertex.x / vertex.w;
+    vertex.y = vertex.y / vertex.w;
+    vertex.z = vertex.z / vertex.w;
+
+    /* range 0-1 */
+    vertex.x = vertex.x * 0.5 + 0.5;
+    vertex.y = vertex.y * 0.5 + 0.5;
+    vertex.z = vertex.z * 0.5 + 0.5;
+    
+    /* map to viewport */
+    vertex.x = vertex.x * viewPortVec[2] + viewPortVec[0];
+    vertex.y = vertex.y * viewPortVec[3] + viewPortVec[1];
+    
+	/* add additional 2D offset if applicable */
+	vertex.x = vertex.x + xySpeed[0];
+	vertex.y = vertex.y + xySpeed[1];
+	
+    /* assign z coord of 3D vertex for later dot size calculation on */
+    vertex.z = vertex3D.z;
+    vertex.w = 1.0;
+
+    /* write 2D vertex to texture */
+    gl_FragColor = vertex;
+
+}

@@ -1,0 +1,40 @@
+/* FDF shader for 1st object render pass: Encodes figure-background
+ * flag into B channel and surface coordinate into RG channels.
+ *
+ * (c) 2008 by Mario Kleiner, licensed under MIT license.
+ */
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect xyzDotCoords;
+uniform sampler2DRect myRandSeeds;
+
+uniform float cubeLength;
+uniform float cubeWidth;
+
+void main(void)
+{
+
+    vec4 vertex = texture2DRect(xyzDotCoords, gl_TexCoord[0].st).rgba;
+    vertex.z = vertex.z + 1.0;
+
+    vec2 randXY = texture2DRect(myRandSeeds, gl_TexCoord[0].st).rg;
+    
+    if (vertex.z >= 0.0)
+    {             
+        /* randomise xy dot position for new dots */
+        vertex.x = randXY.x * cubeWidth - cubeWidth/2.0;
+        vertex.y = randXY.y * cubeWidth - cubeWidth/2.0;
+        
+        /* vertex.x = randXY.x*10-5; */
+        /* vertex.y = randXY.y*10-5; */
+        
+        vertex.z = vertex.z - cubeLength;        
+        
+        vertex.w = 1.0;
+    }
+    
+    /* gl_FragColor.rgba = gl_TexCoord[0].st; */
+    gl_FragColor = vertex;
+
+}

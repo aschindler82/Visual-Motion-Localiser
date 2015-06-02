@@ -1,0 +1,48 @@
+/* FDF vertex shader for 2nd object render pass: Encodes texture coordinates
+ * into vertex position and transformed vertex position into texture coordinates.
+ *
+ * Normal vectors and color vectors are not assigned, as they are meaningless
+ * for this pure "geometry encoded in texture coords." render pass.
+ *
+ * (c) 2008 by Mario Kleiner, licensed under MIT license.
+ */
+
+attribute vec4 vertex2D;
+attribute vec4 dotColour;
+ 
+uniform float maxDotSize;
+uniform float zNear;
+ 
+vec4 vertex2draw;
+
+void main(void)
+{
+    /* store vertex attribute in tmp variable to prevent silly shader */
+    /* warning that we are not allowed to write to vertex attributes  */
+    vertex2draw = vertex2D;
+
+    gl_FrontColor = dotColour;
+    
+    gl_PointSize = -zNear/vertex2draw.z * maxDotSize;
+    
+    /* gl_Position = ftransform(); */
+    
+    
+   
+   /*gl_FrontColor = vec4(1.0,1.0,1.0,1.0);*/
+   /*gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * vec4(50.0, 50.0, 1.0, 1.0);*/
+   
+   if (vertex2draw.z < -zNear)
+   {
+    vertex2draw.z = 1.0;
+    vertex2draw.w = 1.0;    
+    gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * vertex2draw;
+   }
+   else
+   {
+    /* clip vertex */
+    gl_PointSize = 0.0;
+    gl_Position = vec4(0.0, 0.0, 20.0, 1.0);
+   }
+    
+}

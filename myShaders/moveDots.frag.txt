@@ -1,0 +1,55 @@
+/* 
+ * Fragment shader that operates as a vertex shader.
+ *
+ * This shader moves our 3D flow cloud in z direction.
+ * Dots that reach the z == 0 are set back in z direction
+ * and randomly reset on the xy plane.
+ *
+ * (c) by as, August 2014
+ */
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect xyzDotCoords;
+uniform sampler2DRect myRandSeeds;
+
+uniform float cubeLength;
+uniform float cubeWidth;
+ 
+uniform float dotSpeed;
+ 
+void main(void)
+{
+    vec4 vertex = texture2DRect(xyzDotCoords, gl_TexCoord[0].st).rgba;
+    vertex.z = vertex.z + dotSpeed;
+
+    vec2 randXY = texture2DRect(myRandSeeds, gl_TexCoord[0].st).rg;
+    
+    /* did this dot pass zNear? */
+    if (vertex.z >= 0.0)
+    {             
+        /* randomise xy dot position for new dots */
+        vertex.x = randXY.x * cubeWidth - cubeWidth/2.0;
+        vertex.y = randXY.y * cubeWidth - cubeWidth/2.0;        
+        
+        vertex.z = vertex.z - cubeLength;
+        
+        vertex.w = 1.0;
+    }
+    
+    /* did this dot pass zFar? */
+    if (vertex.z <= -cubeLength)
+    {             
+        /* randomise xy dot position for new dots */
+        vertex.x = randXY.x * cubeWidth - cubeWidth/2.0;
+        vertex.y = randXY.y * cubeWidth - cubeWidth/2.0;
+                
+        vertex.z = vertex.z + cubeLength;        
+        
+        vertex.w = 1.0;
+    }
+    
+    /* gl_FragColor.rgba = gl_TexCoord[0].st; */
+    gl_FragColor = vertex;
+
+}

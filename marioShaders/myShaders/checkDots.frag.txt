@@ -1,0 +1,86 @@
+/* FDF shader for sampling of rendered silhouette at provided random
+ * sampling positions in order to update background dot distribution.
+ *
+ * (c) 2008 by Mario Kleiner, licensed under MIT license.
+ */
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect xyzDotCoords;
+uniform sampler2DRect randSeeds;
+uniform sampler2DRect checkTex;
+
+uniform mat4 modelViewMat;
+uniform mat4 modelMat;
+uniform mat4 projMat;
+
+uniform vec4 viewPortVec;
+
+uniform float zNear;
+uniform float zFar;
+
+void main(void)
+{
+
+	/* xy directions */
+	vec2 dirTmp       = vec2(-1.0, 1.0);
+	
+	/* current 3D vertex */
+    vec4 vertex   = texture2DRect(xyzDotCoords, gl_TexCoord[0].st).rgba;
+	vec4 vertex3D = vertex;
+	
+	/* corresponding random numbers */
+	vec4 randNrs  = texture2DRect(randSeeds, gl_TexCoord[0].st).rgba;
+	
+	/* output vertex: i.e. vec4(xDir, yDir, visible flag, 1.0) */
+	vec4 dotParams = texture2DRect(checkTex, gl_TexCoord[0].st).rgba;
+	
+	float vertexIsVisible = 1.0;
+			
+	/* calculate perspective projection based on submitted matrices */
+	vertex = modelMat * vertex;
+	vertex = projMat  * vertex;
+
+	/* divide by w */
+	vertex.x = vertex.x / vertex.w;
+	vertex.y = vertex.y / vertex.w;
+	vertex.z = vertex.z / vertex.w;
+
+	/* range 0-1 */
+	vertex.x = vertex.x * 0.5 + 0.5;
+	vertex.y = vertex.y * 0.5 + 0.5;
+	vertex.z = vertex.z * 0.5 + 0.5;
+	
+	
+	
+	/* does the vertex get clipped in z-direction? */
+	/* check xy clipping */	
+	if ( vertex.x > 0.0 && vertex.x < 1.0 && vertex.y > 0.0 && vertex.y < 1.0 && vertex.z > 0.0 && vertex.z < 1.0)
+    {
+         vertexIsVisible = 1.0;		 
+    }   
+	else
+	{
+	     vertexIsVisible = 0.0;		 
+	}
+		
+	/* if vertex is not visible assign new xy directions to it */	
+	if ( vertexIsVisible == 0.0 )
+	{	
+		/* assign rand xy directions */
+		dotParams.x =  dirTmp[ int(ceil(randNrs.x*2.0)) ];
+		dotParams.y =  dirTmp[ int(ceil(randNrs.y*2.0)) ];
+		
+	    /*dotParams.x = -dotParams.x;*/
+		/*dotParams.y = -dotParams.y;*/
+	}
+		
+	/* assign visibility */
+	dotParams.z = vertexIsVisible;
+	
+	dotParams.w = 1.0;
+    	
+		
+	gl_FragColor = dotParams;
+	
+}

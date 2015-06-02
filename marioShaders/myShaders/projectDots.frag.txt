@@ -1,0 +1,51 @@
+/* FDF shader for 1st object render pass: Encodes figure-background
+ * flag into B channel and surface coordinate into RG channels.
+ *
+ * (c) 2008 by Mario Kleiner, licensed under MIT license.
+ */
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform mat4 modelViewMat;
+uniform mat4 modelMat;
+uniform mat4 projMat;
+
+uniform vec4 viewPortVec;
+
+uniform sampler2DRect xyzDotCoords;
+ 
+void main(void)
+{
+
+    vec4 vertex3D = texture2DRect(xyzDotCoords, gl_TexCoord[0].st).rgba;
+    
+    vec4 vertex = vertex3D;
+    
+    /* calculate perspective projection based on submitted matrices */
+    vertex = modelMat * vertex;
+    vertex = projMat  * vertex;
+
+    /* divide by w */
+    vertex.x = vertex.x / vertex.w;
+    vertex.y = vertex.y / vertex.w;
+    vertex.z = vertex.z / vertex.w;
+
+    /* range 0-1 */
+    vertex.x = vertex.x * 0.5 + 0.5;
+    vertex.y = vertex.y * 0.5 + 0.5;
+    vertex.z = vertex.z * 0.5 + 0.5;
+    
+    
+    /* map to viewport */
+    vertex.x = vertex.x * viewPortVec[2] + viewPortVec[0];
+    vertex.y = vertex.y * viewPortVec[3] + viewPortVec[1];
+    vertex.z = vertex3D.z;
+    vertex.w = 1.0;
+
+    /* gl_FragColor.rgba = gl_TexCoord[0].st; */
+    gl_FragColor = vertex;
+    /* gl_FragColor = vec4(1.0,1.0,1.0,1.0); */
+    
+    /* gl_FragColor = vec4(viewPortVec[2]/2, viewPortVec[3]/2, 1.0,1.0); */
+
+}

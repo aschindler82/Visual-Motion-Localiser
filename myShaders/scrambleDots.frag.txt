@@ -1,0 +1,96 @@
+/*
+ * Fragment shader that operates as a vertex shader.
+ *
+ * This shader is used in the scrambled dots condition and fills up the
+ * buffer 'bufferScrambledDots' with help of dot parameters that were
+ * calculated and stored in a texture using 'checkDots.frag'
+ *
+ * The algorithm projects the corresponding 3D flow dot of this scrambled dot
+ * to screen space and calculates the xy distance that this flow dot travelled
+ * since the last frame. This distance is then added two the last position of the
+ * actual scrambled dot that was rendered last frame.
+ *
+ * Scrambled dots that leave the viewport are set back randomly using a random
+ * numbers texture that gets updated every frame.
+ *
+ * The output of this shader goes to a texture:
+ * (r = x, g = y, b = flowDot.z, a = visibility -> 0/1).
+ *
+ * (c) by as, August 2014
+ */
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect xyDotCoords;      /* pos of projected dots in this frame */
+uniform sampler2DRect xyDotCoordsLast;  /* pos of projected dots in last frame */
+uniform sampler2DRect checkTex;         /* dotparams */
+uniform sampler2DRect myRandSeeds;      /* random number tex */
+uniform sampler2DRect xyScramblesLast;  /* pos of scrambled dots in last frame */
+
+uniform vec4 viewPortVec;
+
+
+void main(void)
+{
+    /* flow dot of this frame */
+    vec4 vertex2D = texture2DRect(xyDotCoords, gl_TexCoord[0].st).rgba;        
+    float thisDotZ = vertex2D.z;
+	vertex2D.z = 1.0;
+	
+    /* same flow dot in last frame */
+    vec4 vertex2Dlast = texture2DRect(xyDotCoordsLast, gl_TexCoord[0].st).rgba;        
+    float lastDotZ = vertex2Dlast.z;
+	vertex2Dlast.z = 1.0;
+	
+    /* get current scramble 2D position of this dot from last frame */
+    vec4 vertex2Dscramble = texture2DRect(xyScramblesLast, gl_TexCoord[0].st).rgba;    
+    
+    /* get dot params, i.e. visibility and xy directions */
+    vec4 dotParams = texture2DRect(checkTex,  gl_TexCoord[0].st).rgba;
+    
+	
+    /* did any dot leave the screen -> yes then put it back */   
+	/* if yes: reassign theoretical dot */
+	/* to guarantee equal dot density we wrapt around x and y screen directions */
+    if (vertex2Dscramble.x > viewPortVec[2])
+    {            
+       vertex2Dscramble.x = vertex2Dscramble.x - viewPortVec[2];      
+    }
+    	
+	if (vertex2Dscramble.x < 0.0)
+	{
+	  vertex2Dscramble.x = vertex2Dscramble.x + viewPortVec[2];
+	}
+	
+	if (vertex2Dscramble.y > viewPortVec[3])
+	{
+	  vertex2Dscramble.y = vertex2Dscramble.y - viewPortVec[3];
+	}
+	
+	if (vertex2Dscramble.y < 0.0)
+	{
+	  vertex2Dscramble.y = vertex2Dscramble.y + viewPortVec[3];
+	}
+	
+	
+    /* just business as usual: calc x/y distances that this */
+    /* theoretical flow dot has been travelled since last frame */
+    /* take also additional 2D distances into account that each dot has been travelled since last frame */
+    /*vec2 diffDist  = vec2( (vertex2D.x + xyOff2D.x) - (vertex2Dlast.x + xyOff2Dlast.x), (vertex2D.y + xyOff2D.y) - (vertex2Dlast.y + xyOff2Dlast.y) );*/
+	vec2 diffDist  = vec2( vertex2D.x - vertex2Dlast.x, vertex2D.y - vertex2Dlast.y );
+	   	
+    /* add this distance to the current scrambled 2D dot */
+    vertex2Dscramble.x = vertex2Dscramble.x + diffDist.x * dotParams.x;
+    vertex2Dscramble.y = vertex2Dscramble.y + diffDist.y * dotParams.y;
+    
+    /* forward visibility flag to w component */
+    /* to be processed by the rendering vertex shader */
+    vertex2Dscramble.w = dotParams.z;
+    
+    /* save current z-position of theoretical flow dot in z coord of scramble dot */
+    /* we will need it during rendering to calculate this 2D's dot size */
+    vertex2Dscramble.z = thisDotZ;
+    
+    /* assign this scrambled dot to our frame buffer */
+    gl_FragColor = vertex2Dscramble;
+}

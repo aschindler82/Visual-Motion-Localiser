@@ -1,0 +1,69 @@
+/* 
+ * Fragment shader that operates as a vertex shader.
+ *
+ * This shader moves our 3D flow cloud in z direction.
+ * Dots that reach the z == 0 are set back in z direction
+ * and randomly reset on the xy plane.
+ *
+ * (c) by as, August 2014
+ */
+
+#extension GL_ARB_texture_rectangle : enable
+
+uniform sampler2DRect xyDotCoords;
+uniform sampler2DRect myRandSeeds;
+
+uniform vec2  xySpeed;
+uniform float radMotion;
+uniform vec4  viewPortVec;
+
+
+mat4 getRotationMatrix(vec3 myAxis, float angle)
+{ 
+ vec3 axis = normalize(myAxis);
+ float s   = sin(radians(angle));
+ float c   = cos(radians(angle));
+ float oc  = 1.0 - c;
+ 
+ return mat4(oc * axis.x * axis.x + c,          oc * axis.x * axis.y - axis.z * s, oc * axis.z * axis.x + axis.y * s, 0.0,
+             oc * axis.x * axis.y + axis.z * s, oc * axis.y * axis.y + c,          oc * axis.y * axis.z - axis.x * s, 0.0,
+             oc * axis.z * axis.x - axis.y * s, oc * axis.y * axis.z + axis.x * s, oc * axis.z * axis.z + c,          0.0,
+             0.0,                               0.0,                               0.0,                               1.0);
+}
+
+ 
+void main(void)
+{
+    /* get rotation matrix for radial motion */
+	vec3 cameraAxis = vec3(0.0, 0.0, 1.0); /* z-axis */
+    mat4 currRotMat = getRotationMatrix(cameraAxis, radMotion);
+	
+	/* get vertex2D */
+    vec4 vertex2D = texture2DRect(xyDotCoords, gl_TexCoord[0].st).rgba;
+	float dotZ = vertex2D.z;
+	vertex2D.z = 1.0;	
+	
+	
+	/* add planar motion */
+    vertex2D.x = vertex2D.x + xySpeed[0];
+	vertex2D.y = vertex2D.y + xySpeed[1];
+
+	/* get random seeds */
+    vec2 randXY = texture2DRect(myRandSeeds, gl_TexCoord[0].st).rg;
+    
+    /* did this dot pass zNear? */
+    if ( vertex2D.x < 0.0 || vertex2D.x > viewPortVec[2] || vertex2D.y < 0.0 || vertex2D.y > viewPortVec[3] )
+    {             
+        /* randomise xy dot position for new dots */
+        vertex2D.x = randXY.x * viewPortVec[2];
+        vertex2D.y = randXY.y * viewPortVec[3];
+                        
+    }
+        
+    /* gl_FragColor.rgba = gl_TexCoord[0].st; */
+	vertex2D.z = dotZ;
+	
+    gl_FragColor = vertex2D;
+
+	
+}
